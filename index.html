@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Ramazon Pro</title>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-slate-950 text-white p-4">
+
+<h1 class="text-2xl font-bold text-yellow-500 text-center">🌙 Ramazon Pro</h1>
+
+<div id="cityName" class="text-center mt-2 opacity-70">
+Joylashuv aniqlanmoqda...
+</div>
+
+<div class="mt-4 p-4 bg-slate-800 rounded text-center">
+<div id="statusText" class="opacity-70 text-sm mb-2">
+Yuklanmoqda...
+</div>
+
+<div id="mainTimer" class="text-3xl text-yellow-500 font-bold">
+--:--:--
+</div>
+</div>
+
+<div class="mt-6">
+<input id="manualCity" placeholder="Shahar kiriting..."
+class="w-full p-3 rounded bg-slate-800 text-white"/>
+<button onclick="loadByCity()" 
+class="mt-2 w-full bg-yellow-500 text-black p-3 rounded font-semibold">
+Shaharni yuklash
+</button>
+</div>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+document.body.style.backgroundColor = tg.themeParams.bg_color || "#0f172a";
+
+let fajrTime = null;
+let maghribTime = null;
+
+/* ====== UTIL ====== */
+
+function parseTimeToDate(timeStr){
+let [h,m] = timeStr.split(":").map(Number);
+let d = new Date();
+d.setHours(h,m,0,0);
+return d;
+}
+
+function formatDiff(diff){
+let h = Math.floor(diff/1000/60/60);
+let m = Math.floor((diff/1000/60)%60);
+let s = Math.floor((diff/1000)%60);
+return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+/* ====== COUNTDOWN LOGIC ====== */
+
+function updateTimer(){
+
+if(!fajrTime || !maghribTime) return;
+
+let now = new Date();
+let fajr = parseTimeToDate(fajrTime);
+let maghrib = parseTimeToDate(maghribTime);
+
+let status = document.getElementById("statusText");
+let timer = document.getElementById("mainTimer");
+
+if(now < fajr){
+let diff = fajr - now;
+status.innerText = "🌅 Saharlikkacha qolgan vaqt:";
+timer.innerText = formatDiff(diff);
+}
+else if(now >= fajr && now < maghrib){
+let diff = maghrib - now;
+status.innerText = "🌇 Iftorgacha qolgan vaqt:";
+timer.innerText = formatDiff(diff);
+}
+else{
+let tomorrowFajr = new Date(fajr);
+tomorrowFajr.setDate(tomorrowFajr.getDate()+1);
+let diff = tomorrowFajr - now;
+status.innerText = "🌙 Ertangi saharlikkacha:";
+timer.innerText = formatDiff(diff);
+}
+}
+
+setInterval(updateTimer,1000);
+
+/* ====== API LOAD ====== */
+
+async function loadByCoords(lat, lon){
+try{
+let res = await fetch(
+`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=3`
+);
+let data = await res.json();
+
+fajrTime = data.data.timings.Fajr;
+maghribTime = data.data.timings.Maghrib;
+
+document.getElementById("cityName").innerText =
+data.data.meta.timezone + " | Auto aniqlangan";
+}
+catch{
+document.getElementById("cityName").innerText =
+"Xatolik yuz berdi. Shaharni qo‘lda kiriting.";
+}
+}
+
+async function loadByCity(){
+let city = document.getElementById("manualCity").value;
+
+try{
+let res = await fetch(
+`https://api.aladhan.com/v1/timingsByCity?city=${city}&country=Uzbekistan&method=3`
+);
+let data = await res.json();
+
+fajrTime = data.data.timings.Fajr;
+maghribTime = data.data.timings.Maghrib;
+
+document.getElementById("cityName").innerText =
+city + " | Shahar tanlangan";
+}
+catch{
+document.getElementById("cityName").innerText =
+"Shahar topilmadi.";
+}
+}
+
+/* ====== AUTO LOCATION ====== */
+
+if(navigator.geolocation){
+navigator.geolocation.getCurrentPosition(
+(pos)=>{
+loadByCoords(pos.coords.latitude, pos.coords.longitude);
+},
+()=>{
+document.getElementById("cityName").innerText =
+"Joylashuv ruxsati berilmadi. Shahar kiriting.";
+}
+);
+}else{
+document.getElementById("cityName").innerText =
+"Geolocation qo‘llab-quvvatlanmaydi.";
+}
+
+</script>
+
+</body>
+</html>
